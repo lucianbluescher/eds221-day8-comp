@@ -1,0 +1,239 @@
+---
+title: "Ggplot practice"
+format: html
+---
+Attaching packages
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggthemes)
+library(NatParksPalettes)
+library(paletteer)
+library(patchwork)
+
+```
+
+# GGplot basics
+Read in lizard data
+```{r}
+lizards <- read.csv(here("data_tidy", "lizards.csv"))
+```
+### The essentials
+1. data
+2. aesthetics
+3.  geometry
+```{r}
+# ggplot essentials, 3 ways
+
+# first 
+# data and aesthetics stay consistent throught plot
+ggplot(data = lizards,
+       aes(x = total_length,y = weight)) + # (1 and 2)
+  geom_point() # 3
+
+# second
+# data stays consistent throughout plot
+ggplot(data = lizards) + 
+  geom_point(aes(x = total_length, y = weight))
+
+
+# third
+# nothing stays consistent
+ggplot() +
+  geom_point(data = lizards,
+             aes(x = total_length,y = weight))
+
+```
+Swap out geometries
+
+```{r}
+# Bad example
+ggplot(data = lizards,
+       aes(x = total_length,y = weight)) + # (1 and 2)
+  geom_line() # 3
+
+```
+Some geometry types only need one axis
+
+```{r}
+ggplot(data = lizards,
+       aes(x = total_length)) + 
+  geom_histogram()
+
+```
+Jitterplots usually are best with one categorical and one continuous variable
+```{r}
+ggplot(data = lizards,
+       aes(x = weight, y = common_name)) +
+  geom_jitter(alpha = 0.5)
+```
+## Aesthetic mapping
+### Updating based on a constant value
+Don't need to use the aes() function
+```{r}
+ggplot(data = lizards, aes(x = weight)) +
+  geom_histogram(color = "#3581b8",
+                 fill = "purple",
+                 alpha = .7,
+                 linetype = "dotted",
+                 )
+```
+## Updating aesthetics based on variables
+In that case, we need to use the 'aes()' function
+```{r}
+ggplot(data = lizards,
+       aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name),
+             alpha = 0.3)
+```
+
+# Themes
+## Update axis labels
+```{r}
+ggplot(data = lizards, aes(x = weight, y = site)) +
+  geom_jitter(aes(color = common_name,
+                  alpha = .6)) + 
+  theme_economist() +
+  labs(x = "Weight (g)",
+       y = "Study Site",
+       title = "Lizard weights across sites at Jornada",
+       color = "Species")
+       
+
+```
+# Reorder data
+```{r}
+lizard_counts <- lizards |> 
+  count(common_name)
+
+ggplot(data = lizard_counts,
+       aes(x = n, y = fct_reorder(common_name, n))) +
+         geom_col() +
+         labs(x = "Individuals(n)",
+              y = "Species common name")
+```
+
+## Advanced ggplot customization
+
+```{r}
+ggplot(data = lizards, 
+       aes(x = total_length, y = weight)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 250, 500),
+                     limits = c(0, 500)) +
+  scale_y_continuous(breaks = seq(from = 0,
+                                  to = 70,
+                                  by = 10),
+                     limits = c(0, 70)) +
+  labs(x = "Total Length (mm)",
+       y = "Weight (grams)") +
+  theme_hc()
+```
+
+```{r}
+ggplot(data = lizards, 
+       aes(x = total_length, y = weight)) +
+  geom_point() +
+  scale_x_log10()
+```
+
+```{r}
+# Counting the number of lizards caught per day
+lizard_counts <- lizards |> 
+  mutate(date = lubridate::mdy(date)) |> 
+count(date)
+
+
+ggplot(data = lizard_counts, 
+       aes(x = date, y = n)) +
+  geom_line() +
+  scale_x_date(breaks = scales::breaks_width("2 years"), 
+               labels = scales::label_date("%Y"))
+```
+
+### Custom aesthetics with "scale_" functions
+```{r}
+ggplot(data = lizards,
+       aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_gradient(low = "red", high = "navy")
+
+# color gradient with more than 2 colors
+ggplot(data = lizards,
+       aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_gradientn(colors = c("orange", "red", "purple", "navy", "black"))
+
+# create a gradient of color bins
+ggplot(data = lizards,
+       aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_steps(low = "red", high = "navy",
+                    breaks = seq(0,80, by = 5))
+```
+
+```{r}
+ggplot(data = lizards,
+       aes(x = common_name, y = total_length)) +
+  geom_boxplot(aes(fill = common_name),
+               show.legend = FALSE) +
+  coord_flip()
+  
+```
+
+```{r}
+lizards_mean <- lizards |> 
+  mutate(common_name = fct_reorder(common_name,
+                                   total_length, .fun = median))
+
+ggplot(data = lizards_mean,
+       aes(y = common_name, x = total_length))+
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  scale_fill_paletteer_d("colorBlindness::Brown2Blue10Steps") +
+  labs(x = "Total Length (mm)", y = "Species") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+  
+```
+# Patchwork to create compount figures
+```{r}
+# Saving plots as objects
+p1 <- ggplot(data = lizard_counts, 
+       aes(x = date, y = n)) +
+  geom_line() +
+  scale_x_date(breaks = scales::breaks_width("2 years"), 
+               labels = scales::label_date("%Y"))
+
+
+p2 <- ggplot(data = lizards_mean,
+       aes(y = common_name, x = total_length))+
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  scale_fill_paletteer_d("colorBlindness::Brown2Blue10Steps") +
+  labs(x = "Total Length (mm)", y = "Species") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+p3 <- ggplot(data = lizards,
+       aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_gradient(low = "red", high = "navy")
+```
+
+```{r}
+# Patchwork to combine plots
+# | puts them next to eachother
+(p1 | p2 | p3)
+
+# "/" puts them on top of eachother
+
+(p1 / p2 / p2/ p2) & theme_minimal()
+
+# combinations of next to and on top of eachother
+p3 <- (p1 / p2 | p1) & theme_minimal()
+p3
+
+# save
+ggsave("test.png", p3)
+```
+
